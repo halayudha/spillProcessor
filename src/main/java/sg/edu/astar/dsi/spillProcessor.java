@@ -1,0 +1,247 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package sg.edu.astar.dsi;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.avro.io.Decoder;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.avro.specific.SpecificDatumReader;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.mapred.Counters;
+import org.apache.hadoop.mapred.IFile;
+import org.apache.hadoop.mapred.IFile.Writer;
+import org.apache.hadoop.mapred.IndexRecord;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.Merger;
+import org.apache.hadoop.mapred.Merger.Segment;
+import org.apache.hadoop.mapred.RawKeyValueIterator;
+import org.apache.hadoop.mapred.SpillRecord;
+import org.apache.hadoop.mapreduce.CryptoUtils;
+import org.apache.hadoop.mapreduce.TaskType;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.zeromq.ZMQ;
+import org.zeromq.ZMQ.Context;
+
+/**
+ *
+ * @author hduser
+ */
+public class spillProcessor {
+    
+    private static class Worker extends Thread{
+        private Context context;
+        private Worker (Context context){
+            this.context = context;
+        }
+        
+        @Override
+        public void run(){
+            ZMQ.Socket socket = context.socket(ZMQ.REP);
+            socket.connect("inproc://workers");
+            //socket.send("world", 0);
+            while (true){
+                byte[] request = socket.recv(0);
+                socket.send("world",0);
+                SpecificDatumReader<spillInfo> reader = new SpecificDatumReader<spillInfo>(spillInfo.getClassSchema());
+                Decoder decoder = DecoderFactory.get().binaryDecoder(request, null);
+                try {
+                    spillInfo sInfo = reader.read(null, decoder);
+                    //System.out.println("sInfo mapperID: " + sInfo.getMapperId());
+                    //System.out.println("sInfo spillFilePath: " + sInfo.getSpillFilePath());
+                    //System.out.println("sInfo indexFilePath: " + sInfo.getSpillIndexPath());
+                    //sendFile(sInfo.getSpillFilePath().toString());
+                    getSpillPartition(
+                                      sInfo.getJobId(),
+                                      sInfo.getMapperId(),
+                                      sInfo.getSpillIndexPath().toString(),
+                                      sInfo.getSpillFilePath().toString(),
+                                      sInfo.getReduceInfo()
+                                      );
+                    /*
+                    try {
+                        sleep(5);
+                    } catch (InterruptedException ex) {
+                        Logger.getLogger(spillProcessor.class.getName()).log(Level.SEVERE, null, ex);
+                    }*/
+                } catch (IOException ex) {
+                    Logger.getLogger(spillProcessor.class.getName()).log(Level.SEVERE, null, ex);
+                }
+                /*
+                String request = socket.recvStr(0);
+                                System.out.println(Thread.currentThread().getName() + 
+                        " Received request: [" + request + "]");*/
+                //socket.send("world", 0);
+            }
+            
+        }
+        
+        private void sendFile(String jobID, String mapperID, String theFile, String theHost) throws IOException{
+            CloseableHttpClient httpclient = HttpClients.createDefault();
+            HttpPost httppost = new HttpPost("http://" + "localhost" + ":8081" + "/fileupload");
+            FileBody bin = new FileBody(new File(theFile));
+            HttpEntity reqEntity = MultipartEntityBuilder.create()
+                    .addTextBody("jobID", jobID)
+                    .addTextBody("mapperID", mapperID)
+                    .addPart("bin",bin)
+                    .build();
+            httppost.setEntity(reqEntity);
+            
+            CloseableHttpResponse response = httpclient.execute(httppost);
+            HttpEntity resEntity = response.getEntity();
+            if (resEntity != null){
+                System.out.println("Response content length: " + resEntity.getContentLength());
+                
+            }
+            EntityUtils.consume(resEntity);
+            response.close();
+            httpclient.close();
+           }
+        
+        private void getSpillPartition(String jobID, String mapperID, String IndexFile, String SpillFile, Map<String,String> reduceInfo) throws IOException{
+            JobConf job = new JobConf();
+            job.setMapOutputKeyClass(Text.class);
+            job.setMapOutputValueClass(IntWritable.class);
+            Class<Text> keyClass = (Class<Text>)job.getMapOutputKeyClass();
+            Class<IntWritable> valClass = (Class<IntWritable>)job.getMapOutputValueClass();
+            FileSystem rfs;
+        CompressionCodec codec = null;
+        Counters.Counter spilledRecordsCounter = null;
+        rfs =((LocalFileSystem)FileSystem.getLocal(job)).getRaw();
+        
+        Path indexFilePath = new Path(IndexFile);
+        SpillRecord sr = new SpillRecord(indexFilePath, job);
+        System.out.println("indexfile partition size() : " + sr.size());
+        
+        
+        long startOffset = 0;
+        //Path spillPartitionFile[] = new Path[sr.size()];
+        Path spillFilePath = new Path(SpillFile);
+        Segment<Text, IntWritable> s = null;
+        
+        List<Segment<Text,IntWritable>> segmentList = new ArrayList<>();
+        for (int i = 0;i<sr.size();i++){ //sr.size is the number of partitions
+                IndexRecord ir = sr.getIndex(i);
+                System.out.println("index[" + i + "] rawLength = " + ir.rawLength);
+                System.out.println("index[" + i + "] partLength = " + ir.partLength);
+                System.out.println("index[" + i + "] startOffset= " + ir.startOffset);
+                startOffset = ir.startOffset;
+                
+                Path spillPartitionFile = new Path("/home/hduser/" + SpillFile +"_finalOutputFile_part_" + i);
+                Path spillPartitionIndexFile = new Path("/home/hduser/" + SpillFile + "_finalOutputFileIndex_part_" + i);
+                FSDataOutputStream spillPartitionFileOut = rfs.create(spillPartitionFile, true, 4096);
+                s = new Segment<>(job, rfs,spillFilePath,
+                                    ir.startOffset,
+                                    ir.partLength,
+                                    codec,
+                                    true
+                                    );
+                segmentList.add(0,s);
+                System.out.println("GOT1");
+                
+                RawKeyValueIterator kvIter = Merger.merge(job, 
+                                                    rfs, 
+                                                    keyClass, 
+                                                    valClass, 
+                                                    null, //codec
+                                                  segmentList,
+                                                  10,//mergeFactor
+                                                  new Path("/home/hduser/temp"),
+                                                  job.getOutputKeyComparator(),//job.getOutputKeyComparator
+                                                  null,//reporter
+                                                  false,//boolean sortSegments
+                                                  null,//null
+                                                  spilledRecordsCounter,
+                                                  null,//sortPhase.phase()
+                                                  TaskType.MAP);
+               
+                System.out.println("GOT2");
+                long segmentStart = spillPartitionFileOut.getPos();
+                FSDataOutputStream finalSpillPartitionFileOut = CryptoUtils.wrapIfNecessary(job, spillPartitionFileOut);
+                System.out.println("GOT2A");
+                Writer <Text,IntWritable> writer = new Writer<Text,IntWritable>(job, finalSpillPartitionFileOut, Text.class, IntWritable.class, codec,
+                                                    spilledRecordsCounter);
+                System.out.println("GOT2J");
+                Merger.writeFile(kvIter, writer, null, job);
+                System.out.println("GOT3");
+                //writer.close();
+                
+                //Creating Index File
+                IndexRecord rec = new IndexRecord();
+                rec.startOffset = segmentStart;
+                rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+                rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
+                
+                final SpillRecord spillRec = new SpillRecord(1);
+                spillRec.putIndex(rec, 0);
+                spillRec.writeToFile(spillPartitionIndexFile, job);
+                
+                
+                writer.close();
+                //Sending New Spill File
+                System.out.println("SENDING: " + spillPartitionFile.toString() + "TO: " + reduceInfo.get(String.valueOf(i)));
+                sendFile(jobID, mapperID, spillPartitionFile.toString(),reduceInfo.get(String.valueOf(i)));
+                //Sending New Index File
+                System.out.println("SENDING: " + spillPartitionIndexFile.toString());
+                sendFile(jobID, mapperID, spillPartitionIndexFile.toString(),reduceInfo.get(String.valueOf(i)));
+                spillPartitionFileOut.close();//Close the newly created spill file
+                
+        }//END FOR LOOP FOR NUMBER OF PARTITIONS.
+        
+        
+        
+        
+        
+        }
+        
+       
+        
+    }
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) {
+        // TODO code application logic here
+        ZMQ.Context context = ZMQ.context(1);
+        ZMQ.Socket clients = context.socket(ZMQ.ROUTER);
+        clients.bind("tcp://*:5555");
+        
+        ZMQ.Socket workers = context.socket(ZMQ.DEALER);
+        workers.bind("inproc://workers");
+        
+        for (int thread_nbr = 0; thread_nbr < 50; thread_nbr++){
+            Thread worker = new Worker (context);
+            worker.start();
+        }
+        
+        //Connect work threads to client threads via a queue
+        ZMQ.proxy(clients, workers, null);
+        
+        clients.close();
+        workers.close();
+        context.term();
+    }
+    
+}
