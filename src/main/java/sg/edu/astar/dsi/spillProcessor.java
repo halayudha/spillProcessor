@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import org.apache.avro.io.Decoder;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.avro.specific.SpecificDatumReader;
@@ -97,13 +98,14 @@ public class spillProcessor {
             
         }
         
-        private void sendFile(String jobID, String mapperID, String theFile, String theHost) throws IOException{
+        private void sendFile(String jobID, String mapperID, String theFile, int partition_no, String theHost) throws IOException{
             CloseableHttpClient httpclient = HttpClients.createDefault();
-            HttpPost httppost = new HttpPost("http://" + "localhost" + ":8081" + "/fileupload");
+            HttpPost httppost = new HttpPost("http://" + theHost + ":8081" + "/fileupload");
             FileBody bin = new FileBody(new File(theFile));
             HttpEntity reqEntity = MultipartEntityBuilder.create()
                     .addTextBody("jobID", jobID)
                     .addTextBody("mapperID", mapperID)
+                    .addTextBody("partitionNo",String.valueOf(partition_no))
                     .addPart("bin",bin)
                     .build();
             httppost.setEntity(reqEntity);
@@ -134,7 +136,6 @@ public class spillProcessor {
         SpillRecord sr = new SpillRecord(indexFilePath, job);
         System.out.println("indexfile partition size() : " + sr.size());
         
-        
         long startOffset = 0;
         //Path spillPartitionFile[] = new Path[sr.size()];
         Path spillFilePath = new Path(SpillFile);
@@ -147,9 +148,16 @@ public class spillProcessor {
                 System.out.println("index[" + i + "] partLength = " + ir.partLength);
                 System.out.println("index[" + i + "] startOffset= " + ir.startOffset);
                 startOffset = ir.startOffset;
+                //Take out ext.
+                System.out.println(SpillFile);
+                String[] tempName = SpillFile.split(Pattern.quote("."));
+                System.out.println("name[0]: " + tempName[0]);
+                String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
+                System.out.println("SpillFileName Length: " + SpillFileName.length);
+                System.out.println("SpillFileName: " + SpillFileName[SpillFileName.length-1]);
                 
-                Path spillPartitionFile = new Path("/home/hduser/" + SpillFile +"_finalOutputFile_part_" + i);
-                Path spillPartitionIndexFile = new Path("/home/hduser/" + SpillFile + "_finalOutputFileIndex_part_" + i);
+                Path spillPartitionFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] +"_p_" + i +".out");
+                Path spillPartitionIndexFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] + "_p_" + i +".out.index");
                 FSDataOutputStream spillPartitionFileOut = rfs.create(spillPartitionFile, true, 4096);
                 s = new Segment<>(job, rfs,spillFilePath,
                                     ir.startOffset,
@@ -201,10 +209,10 @@ public class spillProcessor {
                 writer.close();
                 //Sending New Spill File
                 System.out.println("SENDING: " + spillPartitionFile.toString() + "TO: " + reduceInfo.get(String.valueOf(i)));
-                sendFile(jobID, mapperID, spillPartitionFile.toString(),reduceInfo.get(String.valueOf(i)));
+                sendFile(jobID, mapperID, spillPartitionFile.toString(), i , reduceInfo.get(String.valueOf(i)));
                 //Sending New Index File
                 System.out.println("SENDING: " + spillPartitionIndexFile.toString());
-                sendFile(jobID, mapperID, spillPartitionIndexFile.toString(),reduceInfo.get(String.valueOf(i)));
+                sendFile(jobID, mapperID, spillPartitionIndexFile.toString(), i , reduceInfo.get(String.valueOf(i)));
                 spillPartitionFileOut.close();//Close the newly created spill file
                 
         }//END FOR LOOP FOR NUMBER OF PARTITIONS.
