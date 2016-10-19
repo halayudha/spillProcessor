@@ -128,37 +128,47 @@ public class spillProcessor {
             Class<Text> keyClass = (Class<Text>)job.getMapOutputKeyClass();
             Class<IntWritable> valClass = (Class<IntWritable>)job.getMapOutputValueClass();
             FileSystem rfs;
-        CompressionCodec codec = null;
-        Counters.Counter spilledRecordsCounter = null;
-        rfs =((LocalFileSystem)FileSystem.getLocal(job)).getRaw();
+            CompressionCodec codec = null;
+            Counters.Counter spilledRecordsCounter = null;
+            rfs =((LocalFileSystem)FileSystem.getLocal(job)).getRaw();
         
-        Path indexFilePath = new Path(IndexFile);
-        SpillRecord sr = new SpillRecord(indexFilePath, job);
-        System.out.println("indexfile partition size() : " + sr.size());
+            //GET INFORMATION FROM INDEXFILE
+            Path indexFilePath = new Path(IndexFile);
+            SpillRecord sr = new SpillRecord(indexFilePath, job);
+            System.out.println("indexfile partition size() : " + sr.size());
         
-        long startOffset = 0;
-        //Path spillPartitionFile[] = new Path[sr.size()];
-        Path spillFilePath = new Path(SpillFile);
-        Segment<Text, IntWritable> s = null;
+            long startOffset = 0;
+            Path spillFilePath = new Path(SpillFile);
+            Segment<Text, IntWritable> s = null;
+            
+            //Handling spillFile, We only have one spillFile
+            String[] tempName = SpillFile.split(Pattern.quote("."));//take out the extension ".out"
+            String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
+            
         
-        List<Segment<Text,IntWritable>> segmentList = new ArrayList<>();
-        for (int i = 0;i<sr.size();i++){ //sr.size is the number of partitions
+            List<Segment<Text,IntWritable>> segmentList = new ArrayList<>();
+            for (int i = 0;i<sr.size();i++){ //sr.size is the number of partitions
                 IndexRecord ir = sr.getIndex(i);
                 System.out.println("index[" + i + "] rawLength = " + ir.rawLength);
                 System.out.println("index[" + i + "] partLength = " + ir.partLength);
                 System.out.println("index[" + i + "] startOffset= " + ir.startOffset);
                 startOffset = ir.startOffset;
                 //Take out ext.
+                /*
                 System.out.println(SpillFile);
                 String[] tempName = SpillFile.split(Pattern.quote("."));
                 System.out.println("name[0]: " + tempName[0]);
                 String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
                 System.out.println("SpillFileName Length: " + SpillFileName.length);
                 System.out.println("SpillFileName: " + SpillFileName[SpillFileName.length-1]);
+                */
                 
+                //The output stream for the final output file
                 Path spillPartitionFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] +"_p_" + i +".out");
                 Path spillPartitionIndexFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] + "_p_" + i +".out.index");
                 FSDataOutputStream spillPartitionFileOut = rfs.create(spillPartitionFile, true, 4096);
+                
+                
                 s = new Segment<>(job, rfs,spillFilePath,
                                     ir.startOffset,
                                     ir.partLength,
@@ -166,7 +176,6 @@ public class spillProcessor {
                                     true
                                     );
                 segmentList.add(0,s);
-                System.out.println("GOT1");
                 
                 RawKeyValueIterator kvIter = Merger.merge(job, 
                                                     rfs, 
@@ -183,8 +192,8 @@ public class spillProcessor {
                                                   spilledRecordsCounter,
                                                   null,//sortPhase.phase()
                                                   TaskType.MAP);
-               
-                System.out.println("GOT2");
+                
+                //write to disk
                 long segmentStart = spillPartitionFileOut.getPos();
                 FSDataOutputStream finalSpillPartitionFileOut = CryptoUtils.wrapIfNecessary(job, spillPartitionFileOut);
                 System.out.println("GOT2A");
@@ -193,20 +202,22 @@ public class spillProcessor {
                 System.out.println("GOT2J");
                 Merger.writeFile(kvIter, writer, null, job);
                 System.out.println("GOT3");
-                //writer.close();
+                writer.close();
                 
                 //Creating Index File
                 IndexRecord rec = new IndexRecord();
                 rec.startOffset = segmentStart;
                 rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
                 rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
+                System.out.println("rec.startOffset: " + rec.startOffset);
+                System.out.println("rec.rawLength  : " + rec.rawLength);
+                System.out.println("rec.partLength : " + rec.partLength);
                 
                 final SpillRecord spillRec = new SpillRecord(1);
                 spillRec.putIndex(rec, 0);
                 spillRec.writeToFile(spillPartitionIndexFile, job);
                 
-                
-                writer.close();
+               
                 //Sending New Spill File
                 System.out.println("SENDING: " + spillPartitionFile.toString() + "TO: " + reduceInfo.get(String.valueOf(i)));
                 sendFile(jobID, mapperID, spillPartitionFile.toString(), i , reduceInfo.get(String.valueOf(i)));
@@ -216,7 +227,7 @@ public class spillProcessor {
                 spillPartitionFileOut.close();//Close the newly created spill file
                 
         }//END FOR LOOP FOR NUMBER OF PARTITIONS.
-        
+      
         
         
         
