@@ -44,6 +44,7 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Context;
+import org.apache.hadoop.io.TextDsi;
 
 /**
  *
@@ -123,9 +124,9 @@ public class spillProcessor {
         
         private void getSpillPartition(String jobID, String mapperID, String IndexFile, String SpillFile, Map<String,String> reduceInfo) throws IOException{
             JobConf job = new JobConf();
-            job.setMapOutputKeyClass(Text.class);
+            job.setMapOutputKeyClass(TextDsi.class);
             job.setMapOutputValueClass(IntWritable.class);
-            Class<Text> keyClass = (Class<Text>)job.getMapOutputKeyClass();
+            Class<TextDsi> keyClass = (Class<TextDsi>)job.getMapOutputKeyClass();
             Class<IntWritable> valClass = (Class<IntWritable>)job.getMapOutputValueClass();
             FileSystem rfs;
             CompressionCodec codec = null;
@@ -139,14 +140,14 @@ public class spillProcessor {
         
             long startOffset = 0;
             Path spillFilePath = new Path(SpillFile);
-            Segment<Text, IntWritable> s = null;
+            Segment<TextDsi, IntWritable> s = null;
             
             //Handling spillFile, We only have one spillFile
             String[] tempName = SpillFile.split(Pattern.quote("."));//take out the extension ".out"
             String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
             
         
-            List<Segment<Text,IntWritable>> segmentList = new ArrayList<>();
+            List<Segment<TextDsi,IntWritable>> segmentList = new ArrayList<>();
             for (int i = 0;i<sr.size();i++){ //sr.size is the number of partitions
                 IndexRecord ir = sr.getIndex(i);
                 System.out.println("index[" + i + "] rawLength = " + ir.rawLength);
@@ -197,7 +198,7 @@ public class spillProcessor {
                 long segmentStart = spillPartitionFileOut.getPos();
                 FSDataOutputStream finalSpillPartitionFileOut = CryptoUtils.wrapIfNecessary(job, spillPartitionFileOut);
                 System.out.println("GOT2A");
-                Writer <Text,IntWritable> writer = new Writer<Text,IntWritable>(job, finalSpillPartitionFileOut, Text.class, IntWritable.class, codec,
+                Writer <TextDsi,IntWritable> writer = new Writer<TextDsi,IntWritable>(job, finalSpillPartitionFileOut, TextDsi.class, IntWritable.class, codec,
                                                     spilledRecordsCounter);
                 System.out.println("GOT2J");
                 Merger.writeFile(kvIter, writer, null, job);
