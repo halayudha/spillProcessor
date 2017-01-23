@@ -7,6 +7,7 @@ package sg.edu.astar.dsi;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -102,6 +103,7 @@ public class spillProcessor {
         private void sendFile(String jobID, String mapperID, String theFile, int partition_no, String theHost) throws IOException{
             CloseableHttpClient httpclient = HttpClients.createDefault();
             HttpPost httppost = new HttpPost("http://" + theHost + ":8081" + "/fileupload");
+            //HttpPost httppost = new HttpPost("http://192.168.37.225" + ":8081" + "/fileupload");
             FileBody bin = new FileBody(new File(theFile));
             HttpEntity reqEntity = MultipartEntityBuilder.create()
                     .addTextBody("jobID", jobID)
@@ -165,8 +167,8 @@ public class spillProcessor {
                 */
                 
                 //The output stream for the final output file
-                Path spillPartitionFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] +"_p_" + i +".out");
-                Path spillPartitionIndexFile = new Path("/home/hduser/" + SpillFileName[SpillFileName.length-1] + "_p_" + i +".out.index");
+                Path spillPartitionFile = new Path("/home/hduser/temp/" + SpillFileName[SpillFileName.length-1] +"_p_" + i +".out");
+                Path spillPartitionIndexFile = new Path("/home/hduser/temp/" + SpillFileName[SpillFileName.length-1] + "_p_" + i +".out.index");
                 FSDataOutputStream spillPartitionFileOut = rfs.create(spillPartitionFile, true, 4096);
                 
                 
@@ -226,7 +228,10 @@ public class spillProcessor {
                 System.out.println("SENDING: " + spillPartitionIndexFile.toString());
                 sendFile(jobID, mapperID, spillPartitionIndexFile.toString(), i , reduceInfo.get(String.valueOf(i)));
                 spillPartitionFileOut.close();//Close the newly created spill file
-                
+              
+                //rfs.delete(spillPartitionFile);
+                //rfs.delete(spillPartitionIndexFile);
+                      
         }//END FOR LOOP FOR NUMBER OF PARTITIONS.
       
         
@@ -246,8 +251,8 @@ public class spillProcessor {
         // TODO code application logic here
         ZMQ.Context context = ZMQ.context(1);
         ZMQ.Socket clients = context.socket(ZMQ.ROUTER);
-        clients.bind("tcp://*:5555");
-        
+        //clients.bind("tcp://*:5555");
+        clients.bind("ipc://home/hduser/mappersocket");
         ZMQ.Socket workers = context.socket(ZMQ.DEALER);
         workers.bind("inproc://workers");
         
