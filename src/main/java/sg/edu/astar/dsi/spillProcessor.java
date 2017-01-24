@@ -82,6 +82,13 @@ public class spillProcessor {
                                       sInfo.getSpillFilePath().toString(),
                                       sInfo.getReduceInfo()
                                       );
+                    doCheckPoint(sInfo.getSpillIndexPath().toString(),
+                                 sInfo.getSpillFilePath().toString(),
+                                 sInfo.getTaskId(), //TASKID
+                                 sInfo.getMapperId(),//MAPPERID-ATTEMPT
+                                 sInfo.getNumSpills()
+                                 
+                                 );
                     /*
                     try {
                         sleep(5);
@@ -240,7 +247,65 @@ public class spillProcessor {
         
         }
         
-       
+        private void doCheckPoint(String IndexFile, 
+                                  String SpillFile,
+                                  String TaskID,
+                                  String MapperID,
+                                  int numSpills) throws IOException{
+            JobConf myjob = new JobConf();
+            myjob.setMapOutputKeyClass(TextDsi.class);
+            myjob.setMapOutputValueClass(IntWritable.class);
+            Class<TextDsi> mykeyClass = (Class<TextDsi>)myjob.getMapOutputKeyClass();
+            Class<IntWritable> myvalClass = (Class<IntWritable>)myjob.getMapOutputValueClass();
+            CompressionCodec codec = null;
+            FileSystem rfs =((LocalFileSystem)FileSystem.getLocal(myjob)).getRaw();
+            Counters.Counter spilledRecordsCounter = null;
+            
+            Path indexReadPath = new Path(IndexFile);
+            SpillRecord sr1 = new SpillRecord(indexReadPath, myjob);
+            System.out.println("SpillRecord Size: " + sr1.size());
+            
+            Path mapOutputFileNamePath2 = new Path(SpillFile);
+        
+            List<Segment<TextDsi,IntWritable>> mySegmentList = new ArrayList<>();
+            
+            IndexRecord ir = null;
+            for (int i = 0 ; i < sr1.size(); i++){
+                ir = sr1.getIndex(i);
+                System.out.println("startOffset[" + i +"] = " + ir.startOffset);
+                Segment<TextDsi,IntWritable> mySegment = new Segment<>(myjob,rfs,mapOutputFileNamePath2,
+                                            ir.startOffset,
+                                            ir.partLength,
+                                            codec,
+                                            true);
+                mySegmentList.add(i,mySegment);
+        }
+        RawKeyValueIterator mykvIter = Merger.merge(myjob, 
+                                                    rfs, 
+                                                    mykeyClass, 
+                                                    myvalClass, 
+                                                    null, //codec
+                                                  mySegmentList,
+                                                  10,//mergeFactor
+                                                  new Path("/home/hduser/spillSample/My"),
+                                                  myjob.getOutputKeyComparator(),//job.getOutputKeyComparator
+                                                  null,//reporter
+                                                  false,//boolean sortSegments
+                                                  null,//null
+                                                  spilledRecordsCounter,
+                                                  null,//sortPhase.phase()
+                                                  TaskType.MAP);   
+            
+        Merger.DSIGetSpillCheckPoint(mykvIter, 
+                                        myjob,
+                                        TaskID, 
+                                        MapperID,
+                                        mapOutputFileNamePath2.getName(),
+                                        numSpills);
+            
+            
+            
+        }
         
     }
 

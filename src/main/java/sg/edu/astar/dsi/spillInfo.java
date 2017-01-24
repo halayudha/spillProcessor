@@ -7,9 +7,11 @@ package sg.edu.astar.dsi;
 @SuppressWarnings("all")
 @org.apache.avro.specific.AvroGenerated
 public class spillInfo extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"spillInfo\",\"namespace\":\"sg.edu.astar.dsi\",\"fields\":[{\"name\":\"jobId\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"mapperId\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"spillFilePath\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"spillIndexPath\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"reduceInfo\",\"type\":{\"type\":\"map\",\"values\":{\"type\":\"string\",\"avro.java.string\":\"String\"},\"avro.java.string\":\"String\"}}]}");
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"spillInfo\",\"namespace\":\"sg.edu.astar.dsi\",\"fields\":[{\"name\":\"jobId\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"taskId\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"numSpills\",\"type\":\"int\"},{\"name\":\"mapperId\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"spillFilePath\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"spillIndexPath\",\"type\":{\"type\":\"string\",\"avro.java.string\":\"String\"}},{\"name\":\"reduceInfo\",\"type\":{\"type\":\"map\",\"values\":{\"type\":\"string\",\"avro.java.string\":\"String\"},\"avro.java.string\":\"String\"}}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
   @Deprecated public java.lang.String jobId;
+  @Deprecated public java.lang.String taskId;
+  @Deprecated public int numSpills;
   @Deprecated public java.lang.String mapperId;
   @Deprecated public java.lang.String spillFilePath;
   @Deprecated public java.lang.String spillIndexPath;
@@ -25,8 +27,10 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
   /**
    * All-args constructor.
    */
-  public spillInfo(java.lang.String jobId, java.lang.String mapperId, java.lang.String spillFilePath, java.lang.String spillIndexPath, java.util.Map<java.lang.String,java.lang.String> reduceInfo) {
+  public spillInfo(java.lang.String jobId, java.lang.String taskId, java.lang.Integer numSpills, java.lang.String mapperId, java.lang.String spillFilePath, java.lang.String spillIndexPath, java.util.Map<java.lang.String,java.lang.String> reduceInfo) {
     this.jobId = jobId;
+    this.taskId = taskId;
+    this.numSpills = numSpills;
     this.mapperId = mapperId;
     this.spillFilePath = spillFilePath;
     this.spillIndexPath = spillIndexPath;
@@ -38,10 +42,12 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
   public java.lang.Object get(int field$) {
     switch (field$) {
     case 0: return jobId;
-    case 1: return mapperId;
-    case 2: return spillFilePath;
-    case 3: return spillIndexPath;
-    case 4: return reduceInfo;
+    case 1: return taskId;
+    case 2: return numSpills;
+    case 3: return mapperId;
+    case 4: return spillFilePath;
+    case 5: return spillIndexPath;
+    case 6: return reduceInfo;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -50,10 +56,12 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
   public void put(int field$, java.lang.Object value$) {
     switch (field$) {
     case 0: jobId = (java.lang.String)value$; break;
-    case 1: mapperId = (java.lang.String)value$; break;
-    case 2: spillFilePath = (java.lang.String)value$; break;
-    case 3: spillIndexPath = (java.lang.String)value$; break;
-    case 4: reduceInfo = (java.util.Map<java.lang.String,java.lang.String>)value$; break;
+    case 1: taskId = (java.lang.String)value$; break;
+    case 2: numSpills = (java.lang.Integer)value$; break;
+    case 3: mapperId = (java.lang.String)value$; break;
+    case 4: spillFilePath = (java.lang.String)value$; break;
+    case 5: spillIndexPath = (java.lang.String)value$; break;
+    case 6: reduceInfo = (java.util.Map<java.lang.String,java.lang.String>)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -71,6 +79,36 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
    */
   public void setJobId(java.lang.String value) {
     this.jobId = value;
+  }
+
+  /**
+   * Gets the value of the 'taskId' field.
+   */
+  public java.lang.String getTaskId() {
+    return taskId;
+  }
+
+  /**
+   * Sets the value of the 'taskId' field.
+   * @param value the value to set.
+   */
+  public void setTaskId(java.lang.String value) {
+    this.taskId = value;
+  }
+
+  /**
+   * Gets the value of the 'numSpills' field.
+   */
+  public java.lang.Integer getNumSpills() {
+    return numSpills;
+  }
+
+  /**
+   * Sets the value of the 'numSpills' field.
+   * @param value the value to set.
+   */
+  public void setNumSpills(java.lang.Integer value) {
+    this.numSpills = value;
   }
 
   /**
@@ -155,6 +193,8 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
     implements org.apache.avro.data.RecordBuilder<spillInfo> {
 
     private java.lang.String jobId;
+    private java.lang.String taskId;
+    private int numSpills;
     private java.lang.String mapperId;
     private java.lang.String spillFilePath;
     private java.lang.String spillIndexPath;
@@ -172,21 +212,29 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
         this.jobId = data().deepCopy(fields()[0].schema(), other.jobId);
         fieldSetFlags()[0] = true;
       }
-      if (isValidValue(fields()[1], other.mapperId)) {
-        this.mapperId = data().deepCopy(fields()[1].schema(), other.mapperId);
+      if (isValidValue(fields()[1], other.taskId)) {
+        this.taskId = data().deepCopy(fields()[1].schema(), other.taskId);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.spillFilePath)) {
-        this.spillFilePath = data().deepCopy(fields()[2].schema(), other.spillFilePath);
+      if (isValidValue(fields()[2], other.numSpills)) {
+        this.numSpills = data().deepCopy(fields()[2].schema(), other.numSpills);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.spillIndexPath)) {
-        this.spillIndexPath = data().deepCopy(fields()[3].schema(), other.spillIndexPath);
+      if (isValidValue(fields()[3], other.mapperId)) {
+        this.mapperId = data().deepCopy(fields()[3].schema(), other.mapperId);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.reduceInfo)) {
-        this.reduceInfo = data().deepCopy(fields()[4].schema(), other.reduceInfo);
+      if (isValidValue(fields()[4], other.spillFilePath)) {
+        this.spillFilePath = data().deepCopy(fields()[4].schema(), other.spillFilePath);
         fieldSetFlags()[4] = true;
+      }
+      if (isValidValue(fields()[5], other.spillIndexPath)) {
+        this.spillIndexPath = data().deepCopy(fields()[5].schema(), other.spillIndexPath);
+        fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.reduceInfo)) {
+        this.reduceInfo = data().deepCopy(fields()[6].schema(), other.reduceInfo);
+        fieldSetFlags()[6] = true;
       }
     }
     
@@ -197,21 +245,29 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
         this.jobId = data().deepCopy(fields()[0].schema(), other.jobId);
         fieldSetFlags()[0] = true;
       }
-      if (isValidValue(fields()[1], other.mapperId)) {
-        this.mapperId = data().deepCopy(fields()[1].schema(), other.mapperId);
+      if (isValidValue(fields()[1], other.taskId)) {
+        this.taskId = data().deepCopy(fields()[1].schema(), other.taskId);
         fieldSetFlags()[1] = true;
       }
-      if (isValidValue(fields()[2], other.spillFilePath)) {
-        this.spillFilePath = data().deepCopy(fields()[2].schema(), other.spillFilePath);
+      if (isValidValue(fields()[2], other.numSpills)) {
+        this.numSpills = data().deepCopy(fields()[2].schema(), other.numSpills);
         fieldSetFlags()[2] = true;
       }
-      if (isValidValue(fields()[3], other.spillIndexPath)) {
-        this.spillIndexPath = data().deepCopy(fields()[3].schema(), other.spillIndexPath);
+      if (isValidValue(fields()[3], other.mapperId)) {
+        this.mapperId = data().deepCopy(fields()[3].schema(), other.mapperId);
         fieldSetFlags()[3] = true;
       }
-      if (isValidValue(fields()[4], other.reduceInfo)) {
-        this.reduceInfo = data().deepCopy(fields()[4].schema(), other.reduceInfo);
+      if (isValidValue(fields()[4], other.spillFilePath)) {
+        this.spillFilePath = data().deepCopy(fields()[4].schema(), other.spillFilePath);
         fieldSetFlags()[4] = true;
+      }
+      if (isValidValue(fields()[5], other.spillIndexPath)) {
+        this.spillIndexPath = data().deepCopy(fields()[5].schema(), other.spillIndexPath);
+        fieldSetFlags()[5] = true;
+      }
+      if (isValidValue(fields()[6], other.reduceInfo)) {
+        this.reduceInfo = data().deepCopy(fields()[6].schema(), other.reduceInfo);
+        fieldSetFlags()[6] = true;
       }
     }
 
@@ -240,6 +296,55 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
       return this;
     }
 
+    /** Gets the value of the 'taskId' field */
+    public java.lang.String getTaskId() {
+      return taskId;
+    }
+    
+    /** Sets the value of the 'taskId' field */
+    public sg.edu.astar.dsi.spillInfo.Builder setTaskId(java.lang.String value) {
+      validate(fields()[1], value);
+      this.taskId = value;
+      fieldSetFlags()[1] = true;
+      return this; 
+    }
+    
+    /** Checks whether the 'taskId' field has been set */
+    public boolean hasTaskId() {
+      return fieldSetFlags()[1];
+    }
+    
+    /** Clears the value of the 'taskId' field */
+    public sg.edu.astar.dsi.spillInfo.Builder clearTaskId() {
+      taskId = null;
+      fieldSetFlags()[1] = false;
+      return this;
+    }
+
+    /** Gets the value of the 'numSpills' field */
+    public java.lang.Integer getNumSpills() {
+      return numSpills;
+    }
+    
+    /** Sets the value of the 'numSpills' field */
+    public sg.edu.astar.dsi.spillInfo.Builder setNumSpills(int value) {
+      validate(fields()[2], value);
+      this.numSpills = value;
+      fieldSetFlags()[2] = true;
+      return this; 
+    }
+    
+    /** Checks whether the 'numSpills' field has been set */
+    public boolean hasNumSpills() {
+      return fieldSetFlags()[2];
+    }
+    
+    /** Clears the value of the 'numSpills' field */
+    public sg.edu.astar.dsi.spillInfo.Builder clearNumSpills() {
+      fieldSetFlags()[2] = false;
+      return this;
+    }
+
     /** Gets the value of the 'mapperId' field */
     public java.lang.String getMapperId() {
       return mapperId;
@@ -247,21 +352,21 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
     
     /** Sets the value of the 'mapperId' field */
     public sg.edu.astar.dsi.spillInfo.Builder setMapperId(java.lang.String value) {
-      validate(fields()[1], value);
+      validate(fields()[3], value);
       this.mapperId = value;
-      fieldSetFlags()[1] = true;
+      fieldSetFlags()[3] = true;
       return this; 
     }
     
     /** Checks whether the 'mapperId' field has been set */
     public boolean hasMapperId() {
-      return fieldSetFlags()[1];
+      return fieldSetFlags()[3];
     }
     
     /** Clears the value of the 'mapperId' field */
     public sg.edu.astar.dsi.spillInfo.Builder clearMapperId() {
       mapperId = null;
-      fieldSetFlags()[1] = false;
+      fieldSetFlags()[3] = false;
       return this;
     }
 
@@ -272,21 +377,21 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
     
     /** Sets the value of the 'spillFilePath' field */
     public sg.edu.astar.dsi.spillInfo.Builder setSpillFilePath(java.lang.String value) {
-      validate(fields()[2], value);
+      validate(fields()[4], value);
       this.spillFilePath = value;
-      fieldSetFlags()[2] = true;
+      fieldSetFlags()[4] = true;
       return this; 
     }
     
     /** Checks whether the 'spillFilePath' field has been set */
     public boolean hasSpillFilePath() {
-      return fieldSetFlags()[2];
+      return fieldSetFlags()[4];
     }
     
     /** Clears the value of the 'spillFilePath' field */
     public sg.edu.astar.dsi.spillInfo.Builder clearSpillFilePath() {
       spillFilePath = null;
-      fieldSetFlags()[2] = false;
+      fieldSetFlags()[4] = false;
       return this;
     }
 
@@ -297,21 +402,21 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
     
     /** Sets the value of the 'spillIndexPath' field */
     public sg.edu.astar.dsi.spillInfo.Builder setSpillIndexPath(java.lang.String value) {
-      validate(fields()[3], value);
+      validate(fields()[5], value);
       this.spillIndexPath = value;
-      fieldSetFlags()[3] = true;
+      fieldSetFlags()[5] = true;
       return this; 
     }
     
     /** Checks whether the 'spillIndexPath' field has been set */
     public boolean hasSpillIndexPath() {
-      return fieldSetFlags()[3];
+      return fieldSetFlags()[5];
     }
     
     /** Clears the value of the 'spillIndexPath' field */
     public sg.edu.astar.dsi.spillInfo.Builder clearSpillIndexPath() {
       spillIndexPath = null;
-      fieldSetFlags()[3] = false;
+      fieldSetFlags()[5] = false;
       return this;
     }
 
@@ -322,21 +427,21 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
     
     /** Sets the value of the 'reduceInfo' field */
     public sg.edu.astar.dsi.spillInfo.Builder setReduceInfo(java.util.Map<java.lang.String,java.lang.String> value) {
-      validate(fields()[4], value);
+      validate(fields()[6], value);
       this.reduceInfo = value;
-      fieldSetFlags()[4] = true;
+      fieldSetFlags()[6] = true;
       return this; 
     }
     
     /** Checks whether the 'reduceInfo' field has been set */
     public boolean hasReduceInfo() {
-      return fieldSetFlags()[4];
+      return fieldSetFlags()[6];
     }
     
     /** Clears the value of the 'reduceInfo' field */
     public sg.edu.astar.dsi.spillInfo.Builder clearReduceInfo() {
       reduceInfo = null;
-      fieldSetFlags()[4] = false;
+      fieldSetFlags()[6] = false;
       return this;
     }
 
@@ -345,10 +450,12 @@ public class spillInfo extends org.apache.avro.specific.SpecificRecordBase imple
       try {
         spillInfo record = new spillInfo();
         record.jobId = fieldSetFlags()[0] ? this.jobId : (java.lang.String) defaultValue(fields()[0]);
-        record.mapperId = fieldSetFlags()[1] ? this.mapperId : (java.lang.String) defaultValue(fields()[1]);
-        record.spillFilePath = fieldSetFlags()[2] ? this.spillFilePath : (java.lang.String) defaultValue(fields()[2]);
-        record.spillIndexPath = fieldSetFlags()[3] ? this.spillIndexPath : (java.lang.String) defaultValue(fields()[3]);
-        record.reduceInfo = fieldSetFlags()[4] ? this.reduceInfo : (java.util.Map<java.lang.String,java.lang.String>) defaultValue(fields()[4]);
+        record.taskId = fieldSetFlags()[1] ? this.taskId : (java.lang.String) defaultValue(fields()[1]);
+        record.numSpills = fieldSetFlags()[2] ? this.numSpills : (java.lang.Integer) defaultValue(fields()[2]);
+        record.mapperId = fieldSetFlags()[3] ? this.mapperId : (java.lang.String) defaultValue(fields()[3]);
+        record.spillFilePath = fieldSetFlags()[4] ? this.spillFilePath : (java.lang.String) defaultValue(fields()[4]);
+        record.spillIndexPath = fieldSetFlags()[5] ? this.spillIndexPath : (java.lang.String) defaultValue(fields()[5]);
+        record.reduceInfo = fieldSetFlags()[6] ? this.reduceInfo : (java.util.Map<java.lang.String,java.lang.String>) defaultValue(fields()[6]);
         return record;
       } catch (Exception e) {
         throw new org.apache.avro.AvroRuntimeException(e);
