@@ -7,6 +7,9 @@ package sg.edu.astar.dsi;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,13 +78,7 @@ public class spillProcessor {
                     //System.out.println("sInfo spillFilePath: " + sInfo.getSpillFilePath());
                     //System.out.println("sInfo indexFilePath: " + sInfo.getSpillIndexPath());
                     //sendFile(sInfo.getSpillFilePath().toString());
-                    getSpillPartition(
-                                      sInfo.getJobId(),
-                                      sInfo.getMapperId(),
-                                      sInfo.getSpillIndexPath().toString(),
-                                      sInfo.getSpillFilePath().toString(),
-                                      sInfo.getReduceInfo()
-                                      );
+                    
                     doCheckPoint(sInfo.getSpillIndexPath().toString(),
                                  sInfo.getSpillFilePath().toString(),
                                  sInfo.getTaskId(), //TASKID
@@ -89,6 +86,25 @@ public class spillProcessor {
                                  sInfo.getNumSpills()
                                  
                                  );
+                    
+                    getSpillPartitionThread doSend = new getSpillPartitionThread(
+                                      sInfo.getJobId(),
+                                      sInfo.getMapperId(),
+                                      sInfo.getSpillIndexPath().toString(),
+                                      sInfo.getSpillFilePath().toString(),
+                                      sInfo.getReduceInfo()
+                    );
+                    
+                    doSend.run();
+                    
+                    /*
+                    getSpillPartition(
+                                      sInfo.getJobId(),
+                                      sInfo.getMapperId(),
+                                      sInfo.getSpillIndexPath().toString(),
+                                      sInfo.getSpillFilePath().toString(),
+                                      sInfo.getReduceInfo()
+                                      );*/
                     /*
                     try {
                         sleep(5);
@@ -151,7 +167,14 @@ public class spillProcessor {
             Path spillFilePath = new Path(SpillFile);
             Segment<TextDsi, IntWritable> s = null;
             
-            //Handling spillFile, We only have one spillFile
+            //LOCKIGN MECHANISM
+            /*
+            File fileSpill = new File (SpillFile);
+            FileChannel fileChannel = new RandomAccessFile(fileSpill, "rw").getChannel();
+            FileLock lock = fileChannel.lock();
+            System.out.println("fileSpill: " + fileSpill.getName() + " is LOCKED!"); 
+             */
+//Handling spillFile, We only have one spillFile
             String[] tempName = SpillFile.split(Pattern.quote("."));//take out the extension ".out"
             String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
             
@@ -203,6 +226,8 @@ public class spillProcessor {
                                                   null,//sortPhase.phase()
                                                   TaskType.MAP);
                 
+                 //lock.release();
+                
                 //write to disk
                 long segmentStart = spillPartitionFileOut.getPos();
                 FSDataOutputStream finalSpillPartitionFileOut = CryptoUtils.wrapIfNecessary(job, spillPartitionFileOut);
@@ -213,7 +238,10 @@ public class spillProcessor {
                 Merger.writeFile(kvIter, writer, null, job);
                 System.out.println("GOT3");
                 writer.close();
-                
+               /* 
+                lock.release();
+                System.out.println("file: " + fileSpill.getName() + " is RELEASED!");
+                */
                 //Creating Index File
                 IndexRecord rec = new IndexRecord();
                 rec.startOffset = segmentStart;
@@ -287,7 +315,7 @@ public class spillProcessor {
                                                     null, //codec
                                                   mySegmentList,
                                                   10,//mergeFactor
-                                                  new Path("/home/hduser/spillSample/My"),
+                                                  new Path("/home/hduser/temp"),
                                                   myjob.getOutputKeyComparator(),//job.getOutputKeyComparator
                                                   null,//reporter
                                                   false,//boolean sortSegments
@@ -309,6 +337,169 @@ public class spillProcessor {
         
     }
 
+    private static class getSpillPartitionThread extends Thread{
+        private String jobID;
+        private String mapperID;
+        private String IndexFile;
+        private String SpillFile;
+        private Map<String, String> reduceInfo;
+  
+        
+        public getSpillPartitionThread(String jobID, String mapperID, String IndexFile, String SpillFile, Map<String,String> reduceInfo){
+                this.jobID = jobID;
+                this.mapperID = mapperID;
+                this.IndexFile = IndexFile;
+                this.SpillFile = SpillFile;
+                this.reduceInfo = reduceInfo;
+        }
+        @Override
+        public void run(){
+            try {
+                JobConf job = new JobConf();
+                job.setMapOutputKeyClass(TextDsi.class);
+                job.setMapOutputValueClass(IntWritable.class);
+                Class<TextDsi> keyClass = (Class<TextDsi>)job.getMapOutputKeyClass();
+                Class<IntWritable> valClass = (Class<IntWritable>)job.getMapOutputValueClass();
+                FileSystem rfs;
+                CompressionCodec codec = null;
+                Counters.Counter spilledRecordsCounter = null;
+                rfs =((LocalFileSystem)FileSystem.getLocal(job)).getRaw();
+               
+                //GET INFORMATION FROM INDEXFILE
+                Path indexFilePath = new Path(IndexFile);
+                SpillRecord sr = new SpillRecord(indexFilePath, job);
+                System.out.println("indexfile partition size() : " + sr.size());
+                
+                long startOffset = 0;
+                Path spillFilePath = new Path(SpillFile);
+                Segment<TextDsi, IntWritable> s = null;
+                
+                String[] tempName = SpillFile.split(Pattern.quote("."));//take out the extension ".out"
+                String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
+            
+        
+                List<Segment<TextDsi,IntWritable>> segmentList = new ArrayList<>();
+                for (int i = 0;i<sr.size();i++){ //sr.size is the number of partitions
+                IndexRecord ir = sr.getIndex(i);
+                System.out.println("index[" + i + "] rawLength = " + ir.rawLength);
+                System.out.println("index[" + i + "] partLength = " + ir.partLength);
+                System.out.println("index[" + i + "] startOffset= " + ir.startOffset);
+                startOffset = ir.startOffset;
+                //Take out ext.
+                /*
+                System.out.println(SpillFile);
+                String[] tempName = SpillFile.split(Pattern.quote("."));
+                System.out.println("name[0]: " + tempName[0]);
+                String[] SpillFileName = tempName[0].split(Pattern.quote("/"));
+                System.out.println("SpillFileName Length: " + SpillFileName.length);
+                System.out.println("SpillFileName: " + SpillFileName[SpillFileName.length-1]);
+                */
+                
+                //The output stream for the final output file
+                Path spillPartitionFile = new Path("/home/hduser/temp/" + SpillFileName[SpillFileName.length-1] +"_p_" + i +".out");
+                Path spillPartitionIndexFile = new Path("/home/hduser/temp/" + SpillFileName[SpillFileName.length-1] + "_p_" + i +".out.index");
+                FSDataOutputStream spillPartitionFileOut = rfs.create(spillPartitionFile, true, 4096);
+                
+                
+                s = new Segment<>(job, rfs,spillFilePath,
+                                    ir.startOffset,
+                                    ir.partLength,
+                                    codec,
+                                    true
+                                    );
+                segmentList.add(0,s);
+                
+                RawKeyValueIterator kvIter = Merger.merge(job, 
+                                                    rfs, 
+                                                    keyClass, 
+                                                    valClass, 
+                                                    null, //codec
+                                                  segmentList,
+                                                  10,//mergeFactor
+                                                  new Path("/home/hduser/temp"),
+                                                  job.getOutputKeyComparator(),//job.getOutputKeyComparator
+                                                  null,//reporter
+                                                  false,//boolean sortSegments
+                                                  null,//null
+                                                  spilledRecordsCounter,
+                                                  null,//sortPhase.phase()
+                                                  TaskType.MAP);
+                
+                 //lock.release();
+                
+                //write to disk
+                long segmentStart = spillPartitionFileOut.getPos();
+                FSDataOutputStream finalSpillPartitionFileOut = CryptoUtils.wrapIfNecessary(job, spillPartitionFileOut);
+                System.out.println("GOT2A");
+                Writer <TextDsi,IntWritable> writer = new Writer<TextDsi,IntWritable>(job, finalSpillPartitionFileOut, TextDsi.class, IntWritable.class, codec,
+                                                    spilledRecordsCounter);
+                System.out.println("GOT2J");
+                Merger.writeFile(kvIter, writer, null, job);
+                System.out.println("GOT3");
+                writer.close();
+               /* 
+                lock.release();
+                System.out.println("file: " + fileSpill.getName() + " is RELEASED!");
+                */
+                //Creating Index File
+                IndexRecord rec = new IndexRecord();
+                rec.startOffset = segmentStart;
+                rec.rawLength = writer.getRawLength() + CryptoUtils.cryptoPadding(job);
+                rec.partLength = writer.getCompressedLength() + CryptoUtils.cryptoPadding(job);
+                System.out.println("rec.startOffset: " + rec.startOffset);
+                System.out.println("rec.rawLength  : " + rec.rawLength);
+                System.out.println("rec.partLength : " + rec.partLength);
+                
+                final SpillRecord spillRec = new SpillRecord(1);
+                spillRec.putIndex(rec, 0);
+                spillRec.writeToFile(spillPartitionIndexFile, job);
+                
+               
+                //Sending New Spill File
+                System.out.println("SENDING: " + spillPartitionFile.toString() + "TO: " + reduceInfo.get(String.valueOf(i)));
+                sendFile(jobID, mapperID, spillPartitionFile.toString(), i , reduceInfo.get(String.valueOf(i)));
+                //Sending New Index File
+                System.out.println("SENDING: " + spillPartitionIndexFile.toString());
+                sendFile(jobID, mapperID, spillPartitionIndexFile.toString(), i , reduceInfo.get(String.valueOf(i)));
+                spillPartitionFileOut.close();//Close the newly created spill file
+              
+                //rfs.delete(spillPartitionFile);
+                //rfs.delete(spillPartitionIndexFile);
+                      
+        }//END FOR LOOP FOR NUMBER OF PARTITIONS.
+                
+                
+                
+            } catch (IOException ex) {
+                Logger.getLogger(spillProcessor.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }//END RUN()
+        
+        private void sendFile(String jobID, String mapperID, String theFile, int partition_no, String theHost) throws IOException{
+            CloseableHttpClient httpclient = HttpClients.createDefault();
+            HttpPost httppost = new HttpPost("http://" + theHost + ":8081" + "/fileupload");
+            //HttpPost httppost = new HttpPost("http://192.168.37.225" + ":8081" + "/fileupload");
+            FileBody bin = new FileBody(new File(theFile));
+            HttpEntity reqEntity = MultipartEntityBuilder.create()
+                    .addTextBody("jobID", jobID)
+                    .addTextBody("mapperID", mapperID)
+                    .addTextBody("partitionNo",String.valueOf(partition_no))
+                    .addPart("bin",bin)
+                    .build();
+            httppost.setEntity(reqEntity);
+            
+            CloseableHttpResponse response = httpclient.execute(httppost);
+            HttpEntity resEntity = response.getEntity();
+            if (resEntity != null){
+                System.out.println("Response content length: " + resEntity.getContentLength());
+                
+            }
+            EntityUtils.consume(resEntity);
+            response.close();
+            httpclient.close();
+        }
+    }
+    
     /**
      * @param args the command line arguments
      */
@@ -321,7 +512,7 @@ public class spillProcessor {
         ZMQ.Socket workers = context.socket(ZMQ.DEALER);
         workers.bind("inproc://workers");
         
-        for (int thread_nbr = 0; thread_nbr < 50; thread_nbr++){
+        for (int thread_nbr = 0; thread_nbr < 100; thread_nbr++){
             Thread worker = new Worker (context);
             worker.start();
         }
