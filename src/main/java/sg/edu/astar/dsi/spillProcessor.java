@@ -434,7 +434,8 @@ public class spillProcessor {
                 Writer <TextDsi,IntWritable> writer = new Writer<TextDsi,IntWritable>(job, finalSpillPartitionFileOut, TextDsi.class, IntWritable.class, codec,
                                                     spilledRecordsCounter);
                 System.out.println("GOT2J");
-                Merger.writeFile(kvIter, writer, null, job);
+                //Merger.writeFile(kvIter, writer, null, job);
+                Merger.DSIwriteFile2(kvIter, writer, null, job);
                 System.out.println("GOT3");
                 writer.close();
                /* 
